@@ -751,7 +751,7 @@
         }
       } catch (error) {
         rows.innerHTML = `<tr><td colspan="6">查價失敗：${error.message}</td></tr>`;
-        summary.textContent = "如果你是直接打開 HTML 檔，請改用本地後端網址 http://127.0.0.1:8787。";
+        summary.textContent = "查價失敗。請確認本機已啟動 start_daigou_tool.bat，且查價後端 API 是 http://127.0.0.1:8787。若仍失敗，請更新後端檔案，舊版可能缺少瀏覽器跨來源允許設定。";
       }
     }
 
