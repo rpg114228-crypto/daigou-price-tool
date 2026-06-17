@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>代購選品監控初版</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --text: #18202a;
+      --muted: #657080;
+      --line: #d9dee7;
+      --accent: #0f766e;
+      --accent-dark: #0b5c56;
+      --warn: #b45309;
+      --danger: #b91c1c;
+      --ok: #15803d;
+      --chip: #eef4f3;
+      --shadow: 0 10px 30px rgba(18, 25, 38, .08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Microsoft JhengHei", "Noto Sans TC", Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    header {
+      background: #111827;
+      color: #fff;
+      padding: 18px 22px;
+      border-bottom: 4px solid var(--accent);
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    .sub {
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 16px;
+    }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .section h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: end;
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font: inherit;
+      background: #fff;
+      color: var(--text);
+    }
+
+    textarea {
+      min-height: 150px;
+      resize: vertical;
+    }
+
+    button, .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 8px 12px;
+      background: var(--accent);
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button.secondary, .btn.secondary {
+      background: #fff;
+      color: var(--accent-dark);
+    }
+
+    button.danger {
+      border-color: var(--danger);
+      background: var(--danger);
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .card-title {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .card h3 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 8px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .chip {
+      display: inline-flex;
+      border-radius: 999px;
+      background: var(--chip);
+      border: 1px solid #d5e4e1;
+      padding: 3px 8px;
+      color: #26524e;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .status {
+      font-weight: 700;
+      color: var(--warn);
+    }
+
+    .status.ready { color: var(--ok); }
+    .status.hot { color: var(--danger); }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 700;
+      background: #f8fafc;
+    }
+
+    .result {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcfd;
+    }
+
+    .metric small {
+      display: block;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .metric strong {
+      font-size: 20px;
+    }
+
+    .order-output {
+      white-space: pre-wrap;
+      background: #101827;
+      color: #e5edf7;
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 160px;
+      overflow: auto;
+      font-family: Consolas, "Microsoft JhengHei", monospace;
+      font-size: 13px;
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .price-table-wrap {
+      overflow-x: auto;
+    }
+
+    .best-row td {
+      background: #ecfdf5;
+      font-weight: 700;
+    }
+
+    @media (max-width: 900px) {
+      .grid, .cards, .result {
+        grid-template-columns: 1fr;
+      }
+
+      main { padding: 14px; }
+      header { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>代購選品監控初版</h1>
+    <div class="sub">預設品類：BEYBLADE X / 戰鬥陀螺 X。用途：多國正品來源搜尋、成本利潤試算、LINE 訂單整理。</div>
+  </header>
+
+  <main>
+    <div class="grid">
+      <section class="section">
+        <h2>商品監控清單</h2>
+        <div class="toolbar">
+          <label style="flex: 2 1 260px;">
+            搜尋商品 / 型號
+            <input id="keyword" placeholder="例：BX-50、UX-20、ストームペガシス、戰鬥陀螺">
+          </label>
+          <label style="flex: 1 1 160px;">
+            國家
+            <select id="region">
+              <option value="all">全部</option>
+              <option value="jp">日本</option>
+              <option value="my">馬來西亞</option>
+              <option value="hk">香港</option>
+              <option value="sg">新加坡</option>
+              <option value="th">泰國</option>
+              <option value="kr">韓國</option>
+              <option value="tw">台灣</option>
+            </select>
+          </label>
+          <button id="renderBtn">更新</button>
+          <button class="secondary" id="exportBtn">匯出 JSON</button>
+        </div>
+        <div class="cards" id="productCards"></div>
+      </section>
+
+      <aside class="section">
+        <h2>正品來源規則</h2>
+        <table>
+          <thead>
+            <tr><th>國家</th><th>優先來源</th><th>風險</th></tr>
+          </thead>
+          <tbody id="sourceRows"></tbody>
+        </table>
+        <p class="note">
+          原則：先用日本 TAKARA TOMY 官方頁確認型號與定價，再查各國官方/授權通路。Shopee、Lazada 只優先看 Mall 或官方店，一般賣場只當行情參考。
+        </p>
+      </aside>
+    </div>
+
+    <section class="section">
+      <h2>一鍵查價</h2>
+      <div class="toolbar">
+        <label style="flex: 2 1 260px;">
+          查價商品
+          <input id="priceQuery" value="UX-20 グローリーワルキューレLF BEYBLADE X">
+        </label>
+        <label style="flex: 1 1 160px;">
+          查價地區
+          <select id="priceRegion">
+            <option value="all">全部</option>
+            <option value="日本">日本</option>
+            <option value="馬來西亞">馬來西亞</option>
+            <option value="香港">香港</option>
+            <option value="新加坡">新加坡</option>
+            <option value="台灣">台灣</option>
+          </select>
+        </label>
+        <button id="priceSearchBtn">直接查價</button>
+        <button class="secondary" id="useHotProductBtn">帶入高關注商品</button>
+      </div>
+      <div class="toolbar">
+        <label style="flex: 1 1 320px;">
+          查價後端 API
+          <input id="priceApiBase" value="http://127.0.0.1:8787">
+        </label>
+      </div>
+      <div class="note" id="priceSummary">查價需啟動本地後端：雙擊 <code>start_daigou_tool.bat</code>，或執行 <code>python daigou_price_backend.py</code>。</div>
+      <div class="price-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>地區</th>
+              <th>網站</th>
+              <th>價格</th>
+              <th>約台幣</th>
+              <th>狀態</th>
+              <th>連結</th>
+            </tr>
+          </thead>
+          <tbody id="priceRows">
+            <tr><td colspan="6">尚未查價。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>成本與利潤試算</h2>
+      <div class="toolbar">
+        <label style="flex: 1 1 130px;">
+          商品成本
+          <input id="baseCost" type="number" value="2700">
+        </label>
+        <label style="flex: 1 1 120px;">
+          幣別
+          <select id="currency">
+            <option value="JPY">JPY 日幣</option>
+            <option value="MYR">MYR 馬幣</option>
+            <option value="HKD">HKD 港幣</option>
+            <option value="SGD">SGD 新幣</option>
+            <option value="THB">THB 泰銖</option>
+            <option value="KRW">KRW 韓元</option>
+            <option value="TWD">TWD 台幣</option>
+          </select>
+        </label>
+        <label style="flex: 1 1 130px;">
+          匯率到台幣
+          <input id="fxRate" type="number" step="0.0001" value="0.205">
+        </label>
+        <label style="flex: 1 1 130px;">
+          國際/集運
+          <input id="shipCost" type="number" value="160">
+        </label>
+        <label style="flex: 1 1 130px;">
+          其他成本
+          <input id="otherCost" type="number" value="40">
+        </label>
+        <label style="flex: 1 1 130px;">
+          台灣售價
+          <input id="twPrice" type="number" value="950">
+        </label>
+        <button id="calcBtn">計算</button>
+      </div>
+      <div class="result">
+        <div class="metric"><small>換算台幣成本</small><strong id="costTwd">NT$0</strong></div>
+        <div class="metric"><small>預估總成本</small><strong id="totalCost">NT$0</strong></div>
+        <div class="metric"><small>預估毛利</small><strong id="profit">NT$0</strong></div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="section">
+        <h2>LINE 訂單整理</h2>
+        <textarea id="lineText" placeholder="貼上 LINE 訊息，例如：
+我要 UX-20 兩個
+姓名：王小明
+電話：0912345678
+地址：高雄市小港區...
+備註：可接受預購"></textarea>
+        <div class="toolbar" style="margin-top: 10px;">
+          <button id="parseBtn">解析訂單</button>
+          <button class="secondary" id="copyOrderBtn">複製結果</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>解析結果</h2>
+        <div class="order-output" id="orderOutput">尚未解析。</div>
+      </section>
+    </div>
+
+    <section class="section">
+      <h2>本地 Ollama 分析</h2>
+      <div class="toolbar">
+        <label style="flex: 2 1 260px;">
+          Ollama API
+          <input id="ollamaUrl" value="http://localhost:11434">
+        </label>
+        <label style="flex: 1 1 180px;">
+          模型
+          <input id="ollamaModel" value="wenai-hermes:latest" placeholder="例：wenai-hermes:latest、qwen2.5-coder:7b">
+        </label>
+        <button id="ollamaTestBtn">測試連線</button>
+        <button class="secondary" id="ollamaAnalyzeBtn">分析目前文字</button>
+      </div>
+      <textarea id="ollamaInput" placeholder="貼上商品資訊、買家訊息或搜尋結果，Ollama 會整理成代購判斷。"></textarea>
+      <div class="toolbar" style="margin-top: 10px;">
+        <button class="secondary" id="fillFromOrderBtn">帶入 LINE 訂單</button>
+        <button class="secondary" id="fillFromProductsBtn">帶入監控商品</button>
+      </div>
+      <div class="order-output" id="ollamaOutput">尚未連線。</div>
+      <p class="note">
+        若瀏覽器顯示連線失敗，通常是 Ollama 未啟動或 CORS 限制。可先確認本機有執行 <code>ollama serve</code>，必要時把 Ollama 允許來源設為本機網頁。
+      </p>
+    </section>
+  </main>
+
+  <script>
+    const products = [
+      {
+        code: "UX-20",
+        name: "グローリーワルキューレLF",
+        zh: "榮耀女武神 LF",
+        category: "熱門新品",
+        release: "2026-07-11",
+        officialPrice: 2700,
+        currency: "JPY",
+        status: "hot",
+        tags: ["預購", "人氣角色", "日本官方"],
+        query: "UX-20 グローリーワルキューレLF BEYBLADE X"
+      },
+      {
+        code: "BX-50",
+        name: "ランダムブースターVol.11",
+        zh: "隨機補充包 Vol.11",
+        category: "隨機盒",
+        release: "2026-07-11",
+        officialPrice: 1600,
+        currency: "JPY",
+        status: "hot",
+        tags: ["預購", "隨機款", "補貨監控"],
+        query: "BX-50 ランダムブースターVol.11 BEYBLADE X"
+      },
+      {
+        code: "BX-00",
+        name: "ストームペガシス3-70RA",
+        zh: "暴風天馬 3-70RA",
+        category: "復刻/話題款",
+        release: "2026-07-11",
+        officialPrice: 2620,
+        currency: "JPY",
+        status: "hot",
+        tags: ["預購", "復刻", "高關注"],
+        query: "BX-00 ストームペガシス3-70RA BEYBLADE X"
+      },
+      {
+        code: "CX-00",
+        name: "エヴァンゲリオンデッキセット",
+        zh: "福音戰士牌組組",
+        category: "聯名限定",
+        release: "2026-08-29",
+        officialPrice: 7500,
+        currency: "JPY",
+        status: "hot",
+        tags: ["聯名", "限定", "高單價"],
+        query: "CX-00 エヴァンゲリオンデッキセット BEYBLADE X"
+      },
+      {
+        code: "CX-18",
+        name: "ランダムブースター ブラキオウィップセレクト",
+        zh: "腕龍鞭精選隨機補充包",
+        category: "已發售",
+        release: "2026-06-13",
+        officialPrice: 1600,
+        currency: "JPY",
+        status: "ready",
+        tags: ["已發售", "補貨監控"],
+        query: "CX-18 ブラキオウィップセレクト BEYBLADE X"
+      },
+      {
+        code: "BX-51",
+        name: "ストリングランチャー ブラック×グリーン",
+        zh: "拉繩發射器 黑綠",
+        category: "配件",
+        release: "2026-06-13",
+        officialPrice: 1100,
+        currency: "JPY",
+        status: "ready",
+        tags: ["配件", "補貨監控"],
+        query: "BX-51 ストリングランチャー ブラック グリーン BEYBLADE X"
+      }
+    ];
+
+    const regions = {
+      jp: {
+        name: "日本",
+        sources: "TAKARA TOMY Mall、Amazon JP、Rakuten、Yahoo JP、BicCamera、Yodobashi",
+        risk: "低到中，注意活動限定與抽選",
+        searches: [
+          ["Google JP", "https://www.google.co.jp/search?q="],
+          ["Google Shopping JP", "https://www.google.co.jp/search?tbm=shop&q="],
+          ["Amazon JP", "https://www.amazon.co.jp/s?k="],
+          ["Rakuten", "https://search.rakuten.co.jp/search/mall/"],
+          ["Yahoo JP", "https://shopping.yahoo.co.jp/search?p="],
+          ["TAKARA TOMY Mall", "https://takaratomymall.jp/shop/goods/search.aspx?search=x&keyword="]
+        ]
+      },
+      my: {
+        name: "馬來西亞",
+        sources: "Toys R Us MY、Shopee Mall MY、Lazada MY、AEON",
+        risk: "中，需優先看 Mall/官方店",
+        searches: [
+          ["Google MY", "https://www.google.com.my/search?q="],
+          ["Shopee MY", "https://shopee.com.my/search?keyword="],
+          ["Lazada MY", "https://www.lazada.com.my/catalog/?q="],
+          ["Toys R Us MY", "https://www.toysrus.com.my/search?q="]
+        ]
+      },
+      hk: {
+        name: "香港",
+        sources: "Toys R Us HK、官方授權玩具店、HKTVmall",
+        risk: "中，價格接近台灣但到貨快",
+        searches: [
+          ["Google HK", "https://www.google.com.hk/search?q="],
+          ["HKTVmall", "https://www.hktvmall.com/hktv/zh/search_a?keyword="],
+          ["Toys R Us HK", "https://www.toysrus.com.hk/search?q="]
+        ]
+      },
+      sg: {
+        name: "新加坡",
+        sources: "Toys R Us SG、Shopee Mall SG、Lazada SG",
+        risk: "中，英文資訊清楚但運費需估",
+        searches: [
+          ["Google SG", "https://www.google.com.sg/search?q="],
+          ["Shopee SG", "https://shopee.sg/search?keyword="],
+          ["Lazada SG", "https://www.lazada.sg/catalog/?q="],
+          ["Toys R Us SG", "https://www.toysrus.com.sg/search?q="]
+        ]
+      },
+      th: {
+        name: "泰國",
+        sources: "Toys R Us TH、Lazada TH、Shopee TH",
+        risk: "中高，語言與賣場正品判斷要人工複核",
+        searches: [
+          ["Google TH", "https://www.google.co.th/search?q="],
+          ["Shopee TH", "https://shopee.co.th/search?keyword="],
+          ["Lazada TH", "https://www.lazada.co.th/catalog/?q="]
+        ]
+      },
+      kr: {
+        name: "韓國",
+        sources: "Naver Shopping、Coupang、官方代理/玩具通路",
+        risk: "中，可能有韓版或代理版差異",
+        searches: [
+          ["Google KR", "https://www.google.co.kr/search?q="],
+          ["Naver Shopping", "https://search.shopping.naver.com/search/all?query="],
+          ["Coupang", "https://www.coupang.com/np/search?q="]
+        ]
+      },
+      tw: {
+        name: "台灣",
+        sources: "momo、PChome、蝦皮商城、玩具反斗城、露天行情",
+        risk: "行情比對用，非一定採購來源",
+        searches: [
+          ["Google TW", "https://www.google.com.tw/search?q="],
+          ["momo", "https://www.momoshop.com.tw/search/searchShop.jsp?keyword="],
+          ["PChome", "https://ecshweb.pchome.com.tw/search/v3.3/?q="],
+          ["蝦皮 TW", "https://shopee.tw/search?keyword="],
+          ["露天", "https://www.ruten.com.tw/find/?q="]
+        ]
+      }
+    };
+
+    const fxDefaults = {
+      JPY: 0.205,
+      MYR: 6.55,
+      HKD: 4.15,
+      SGD: 24.2,
+      THB: 0.9,
+      KRW: 0.024,
+      TWD: 1
+    };
+
+    function money(n) {
+      return "NT$" + Math.round(Number(n || 0)).toLocaleString("zh-TW");
+    }
+
+    function makeSearchLinks(product, selectedRegion) {
+      const keys = selectedRegion === "all" ? Object.keys(regions) : [selectedRegion];
+      const links = [];
+      keys.forEach(key => {
+        regions[key].searches.forEach(([label, base]) => {
+          links.push(`<a class="btn secondary" target="_blank" rel="noopener" href="${base}${encodeURIComponent(product.query)}">${regions[key].name} ${label}</a>`);
+        });
+      });
+      return links.join("");
+    }
+
+    function renderProducts() {
+      const keyword = document.getElementById("keyword").value.trim().toLowerCase();
+      const selectedRegion = document.getElementById("region").value;
+      const box = document.getElementById("productCards");
+      const filtered = products.filter(item => {
+        const hay = `${item.code} ${item.name} ${item.zh} ${item.category} ${item.query}`.toLowerCase();
+        return !keyword || hay.includes(keyword);
+      });
+
+      box.innerHTML = filtered.map(item => `
+        <article class="card">
+          <div class="card-title">
+            <h3>${item.code} ${item.zh}</h3>
+            <span class="status ${item.status}">${item.status === "hot" ? "高關注" : "可追蹤"}</span>
+          </div>
+          <div>${item.name}</div>
+          <div class="meta">
+            <span class="chip">${item.category}</span>
+            <span class="chip">發售 ${item.release}</span>
+            <span class="chip">${item.currency} ${item.officialPrice.toLocaleString("ja-JP")}</span>
+            ${item.tags.map(tag => `<span class="chip">${tag}</span>`).join("")}
+          </div>
+          <div class="links">${makeSearchLinks(item, selectedRegion)}</div>
+        </article>
+      `).join("") || `<div class="note">沒有符合的商品。</div>`;
+    }
+
+    function renderSources() {
+      document.getElementById("sourceRows").innerHTML = Object.values(regions).map(region => `
+        <tr>
+          <td>${region.name}</td>
+          <td>${region.sources}</td>
+          <td>${region.risk}</td>
+        </tr>
+      `).join("");
+    }
+
+    function calculate() {
+      const base = Number(document.getElementById("baseCost").value || 0);
+      const fx = Number(document.getElementById("fxRate").value || 0);
+      const ship = Number(document.getElementById("shipCost").value || 0);
+      const other = Number(document.getElementById("otherCost").value || 0);
+      const tw = Number(document.getElementById("twPrice").value || 0);
+      const costTwd = base * fx;
+      const total = costTwd + ship + other;
+      const profit = tw - total;
+
+      document.getElementById("costTwd").textContent = money(costTwd);
+      document.getElementById("totalCost").textContent = money(total);
+      document.getElementById("profit").textContent = money(profit);
+      document.getElementById("profit").style.color = profit >= 0 ? "var(--ok)" : "var(--danger)";
+    }
+
+    function formatForeignPrice(row) {
+      if (!row.price) return "-";
+      const value = Math.round(row.price).toLocaleString("zh-TW");
+      return `${row.currency} ${value}`;
+    }
+
+    function getPriceApiBase() {
+      const explicit = document.getElementById("priceApiBase").value.trim().replace(/\/+$/, "");
+      if (explicit) return explicit;
+      if (location.hostname === "127.0.0.1" || location.hostname === "localhost") return "";
+      return "http://127.0.0.1:8787";
+    }
+
+    async function searchPrices() {
+      const query = document.getElementById("priceQuery").value.trim();
+      const region = document.getElementById("priceRegion").value;
+      const rows = document.getElementById("priceRows");
+      const summary = document.getElementById("priceSummary");
+      if (!query) {
+        summary.textContent = "請先輸入商品名稱或型號。";
+        return;
+      }
+      rows.innerHTML = `<tr><td colspan="6">查價中，請稍候...</td></tr>`;
+      summary.textContent = "正在抓取各網站候選價格。";
+      try {
+        const base = getPriceApiBase();
+        const res = await fetch(`${base}/api/prices?q=${encodeURIComponent(query)}&region=${encodeURIComponent(region)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "查價失敗");
+        const bestKey = data.best ? `${data.best.source}|${data.best.url}` : "";
+        rows.innerHTML = data.results.map(row => {
+          const key = `${row.source}|${row.url}`;
+          const isBest = key === bestKey;
+          const priceTwd = row.price_twd ? `NT$${row.price_twd.toLocaleString("zh-TW")}` : "-";
+          const status = row.price ? row.note : `${row.status}：${row.note}`;
+          return `
+            <tr class="${isBest ? "best-row" : ""}">
+              <td>${row.region}</td>
+              <td>${row.source}</td>
+              <td>${formatForeignPrice(row)}</td>
+              <td>${priceTwd}</td>
+              <td>${status}</td>
+              <td><a class="btn secondary" href="${row.url}" target="_blank" rel="noopener">開啟</a></td>
+            </tr>
+          `;
+        }).join("");
+        if (data.best) {
+          summary.textContent = `目前最低候選價：${data.best.region} ${data.best.source}，${formatForeignPrice(data.best)}，約 NT$${data.best.price_twd.toLocaleString("zh-TW")}。`;
+          document.getElementById("baseCost").value = Math.round(data.best.price);
+          document.getElementById("currency").value = data.best.currency;
+          document.getElementById("fxRate").value = fxDefaults[data.best.currency] || 1;
+          calculate();
+        } else {
+          summary.textContent = "沒有解析到價格。可能是網站動態載入、阻擋爬取，或需要改用 API/Playwright。";
+        }
+      } catch (error) {
+        rows.innerHTML = `<tr><td colspan="6">查價失敗：${error.message}</td></tr>`;
+        summary.textContent = "如果你是直接打開 HTML 檔，請改用本地後端網址 http://127.0.0.1:8787。";
+      }
+    }
+
+    function useHotProductForPrice() {
+      const item = products.find(product => product.status === "hot") || products[0];
+      document.getElementById("priceQuery").value = item.query;
+    }
+
+    function parseOrderText() {
+      const text = document.getElementById("lineText").value.trim();
+      const lines = text.split(/\n+/).map(s => s.trim()).filter(Boolean);
+      const pick = patterns => {
+        for (const p of patterns) {
+          const hit = text.match(p);
+          if (hit) return hit[1].trim();
+        }
+        return "";
+      };
+
+      const phone = pick([/(09\d{8})/, /電話[:：\s]*([0-9\- +]{8,})/]);
+      const name = pick([/姓名[:：\s]*([^\n]+)/, /收件人[:：\s]*([^\n]+)/]);
+      const address = pick([/地址[:：\s]*([^\n]+)/, /取貨[:：\s]*([^\n]+)/]);
+      const note = pick([/備註[:：\s]*([^\n]+)/, /備注[:：\s]*([^\n]+)/]);
+      const quantity = pick([/數量[:：\s]*(\d+)/, /([0-9一二三四五六七八九十]+)\s*(個|顆|組|盒)/]);
+      const productLine = lines.find(line => /(BX|UX|CX)-?\d+|戰鬥陀螺|BEYBLADE|ベイブレード|pegasis|valkyrie/i.test(line)) || "";
+
+      const order = {
+        order_id: "DG" + new Date().toISOString().replace(/\D/g, "").slice(0, 14),
+        created_at: new Date().toLocaleString("zh-TW"),
+        product: productLine,
+        quantity: quantity || "待確認",
+        buyer_name: name || "待確認",
+        phone: phone || "待確認",
+        address: address || "待確認",
+        note: note || "無",
+        raw_text: text
+      };
+
+      document.getElementById("orderOutput").textContent = JSON.stringify(order, null, 2);
+    }
+
+    function getOllamaBaseUrl() {
+      return document.getElementById("ollamaUrl").value.trim().replace(/\/+$/, "");
+    }
+
+    async function testOllama() {
+      const output = document.getElementById("ollamaOutput");
+      output.textContent = "連線測試中...";
+      try {
+        const res = await fetch(`${getOllamaBaseUrl()}/api/tags`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const models = (data.models || []).map(model => model.name).join("\n") || "沒有讀到模型，請先 ollama pull 模型。";
+        output.textContent = `Ollama 連線成功。\n\n可用模型：\n${models}`;
+      } catch (error) {
+        output.textContent = `Ollama 連線失敗：${error.message}\n\n檢查：\n1. 是否已啟動 ollama serve\n2. API 是否為 http://localhost:11434\n3. 若是 CORS 問題，改用本地 proxy 或設定 OLLAMA_ORIGINS`;
+      }
+    }
+
+    async function analyzeWithOllama() {
+      const input = document.getElementById("ollamaInput").value.trim();
+      const model = document.getElementById("ollamaModel").value.trim();
+      const output = document.getElementById("ollamaOutput");
+      if (!input) {
+        output.textContent = "請先貼上要分析的文字。";
+        return;
+      }
+      if (!model) {
+        output.textContent = "請先填 Ollama 模型名稱。";
+        return;
+      }
+
+      const prompt = `你是代購選品助手，請用繁體中文、固定格式、簡潔條列分析以下資料。
+
+任務：
+1. 判斷商品名稱、型號、可能版本。
+2. 標記正品來源風險。
+3. 整理買家需求或訂單欄位。
+4. 給代購判斷：高關注 / 可追蹤 / 不建議。
+5. 列出下一步要查的國家與關鍵字。
+
+資料：
+${input}`;
+
+      output.textContent = "Ollama 分析中...";
+      try {
+        const res = await fetch(`${getOllamaBaseUrl()}/api/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model,
+            prompt,
+            stream: false,
+            options: {
+              temperature: 0.2
+            }
+          })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        output.textContent = data.response || "Ollama 沒有回傳內容。";
+      } catch (error) {
+        output.textContent = `分析失敗：${error.message}\n\n若瀏覽器直連被擋，下一版改成本地 Python/Node proxy 呼叫 Ollama。`;
+      }
+    }
+
+    function fillOllamaFromOrder() {
+      const text = document.getElementById("lineText").value.trim();
+      const parsed = document.getElementById("orderOutput").textContent.trim();
+      document.getElementById("ollamaInput").value = `LINE 原文：\n${text || "無"}\n\n解析結果：\n${parsed}`;
+    }
+
+    function fillOllamaFromProducts() {
+      const selected = products.map(item => ({
+        code: item.code,
+        name: item.name,
+        zh: item.zh,
+        category: item.category,
+        release: item.release,
+        officialPrice: `${item.currency} ${item.officialPrice}`,
+        tags: item.tags
+      }));
+      document.getElementById("ollamaInput").value = JSON.stringify(selected, null, 2);
+    }
+
+    document.getElementById("renderBtn").addEventListener("click", renderProducts);
+    document.getElementById("keyword").addEventListener("input", renderProducts);
+    document.getElementById("region").addEventListener("change", renderProducts);
+    document.getElementById("calcBtn").addEventListener("click", calculate);
+    document.getElementById("priceSearchBtn").addEventListener("click", searchPrices);
+    document.getElementById("useHotProductBtn").addEventListener("click", useHotProductForPrice);
+    document.getElementById("currency").addEventListener("change", event => {
+      document.getElementById("fxRate").value = fxDefaults[event.target.value];
+      calculate();
+    });
+    document.getElementById("parseBtn").addEventListener("click", parseOrderText);
+    document.getElementById("copyOrderBtn").addEventListener("click", async () => {
+      await navigator.clipboard.writeText(document.getElementById("orderOutput").textContent);
+    });
+    document.getElementById("ollamaTestBtn").addEventListener("click", testOllama);
+    document.getElementById("ollamaAnalyzeBtn").addEventListener("click", analyzeWithOllama);
+    document.getElementById("fillFromOrderBtn").addEventListener("click", fillOllamaFromOrder);
+    document.getElementById("fillFromProductsBtn").addEventListener("click", fillOllamaFromProducts);
+    document.getElementById("exportBtn").addEventListener("click", () => {
+      const payload = JSON.stringify({ products, regions }, null, 2);
+      const blob = new Blob([payload], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "daigou_beyblade_watchlist.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    renderSources();
+    renderProducts();
+    calculate();
+  </script>
+</body>
+</html>
