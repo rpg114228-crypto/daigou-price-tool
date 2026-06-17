@@ -60,6 +60,8 @@ SOURCES = [
         "name": "PChome",
         "currency": "TWD",
         "url": "https://ecshweb.pchome.com.tw/search/v3.3/all/results?q={q}&page=1&sort=sale/dc",
+        "display_url": "https://24h.pchome.com.tw/search/?q={q}",
+        "parser": "pchome_json",
         "price_patterns": [r'"price"\s*:\s*([0-9]{2,})'],
     },
     {
@@ -68,7 +70,7 @@ SOURCES = [
         "currency": "TWD",
         "min_price": 300,
         "url": "https://www.momoshop.com.tw/search/searchShop.jsp?keyword={q}",
-        "price_patterns": [r"\$?\s*([0-9,]{3,})"],
+        "price_patterns": [],
     },
     {
         "region": "馬來西亞",
@@ -143,17 +145,62 @@ def title_from_html(html):
     return title[:120]
 
 
+def query_tokens(query):
+    raw = re.split(r"[\s　/|,，、()（）\[\]【】]+", query.lower())
+    tokens = []
+    for token in raw:
+        token = token.strip()
+        if len(token) < 2:
+            continue
+        if token in {"x", "jp", "the", "and"}:
+            continue
+        tokens.append(token)
+    return tokens
+
+
+def is_relevant(text, query):
+    hay = (text or "").lower()
+    tokens = query_tokens(query)
+    if not tokens:
+        return True
+    strong = [token for token in tokens if re.search(r"(bx|ux|cx)-?\d+", token, re.I)]
+    if strong:
+        return any(token.replace("-", "") in hay.replace("-", "") for token in strong)
+    return sum(1 for token in tokens if token in hay) >= min(2, len(tokens))
+
+
+def parse_pchome_json(text, query):
+    data = json.loads(text)
+    products = data.get("prods") or []
+    candidates = []
+    for product in products:
+        name = product.get("name") or ""
+        desc = product.get("describe") or ""
+        if not is_relevant(f"{name} {desc}", query):
+            continue
+        price = product.get("price")
+        try:
+            price = float(price)
+        except (TypeError, ValueError):
+            continue
+        if price >= MIN_PRICE["TWD"]:
+            candidates.append((price, name))
+    candidates.sort(key=lambda item: item[0])
+    return candidates
+
+
 def search_prices(query, region):
     wanted = [s for s in SOURCES if region in ("all", "", s["region"])]
     results = []
     for source in wanted:
         url = source["url"].format(q=quote(query))
+        display_url = source.get("display_url", source["url"]).format(q=quote(query))
         started = time.time()
         item = {
             "region": source["region"],
             "source": source["name"],
             "currency": source["currency"],
-            "url": url,
+            "url": display_url,
             "status": "ok",
             "price": None,
             "price_twd": None,
@@ -164,7 +211,13 @@ def search_prices(query, region):
         try:
             html = fetch_text(url)
             item["title"] = title_from_html(html)
-            prices = extract_prices(html, source["price_patterns"], source["currency"])
+            if source.get("parser") == "pchome_json":
+                structured = parse_pchome_json(html, query)
+                prices = [price for price, _name in structured]
+                if structured:
+                    item["title"] = structured[0][1]
+            else:
+                prices = extract_prices(html, source["price_patterns"], source["currency"])
             if source.get("min_price"):
                 prices = [price for price in prices if price >= source["min_price"]]
             if prices:
