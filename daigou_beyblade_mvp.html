@@ -719,6 +719,14 @@
       summary.textContent = "正在抓取各網站候選價格。";
       try {
         const base = getPriceApiBase();
+        const isPages = location.hostname.endsWith("github.io");
+        const isLoopbackApi = /^http:\/\/(127\.0\.0\.1|localhost):8787$/i.test(base);
+        if (isPages && isLoopbackApi) {
+          const localUrl = `${base}/?autoPrice=1&q=${encodeURIComponent(query)}&region=${encodeURIComponent(region)}`;
+          summary.textContent = "GitHub Pages 無法穩定直接讀取本機 API，正在切換到本機查價版。";
+          location.href = localUrl;
+          return;
+        }
         const res = await fetch(`${base}/api/prices?q=${encodeURIComponent(query)}&region=${encodeURIComponent(region)}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -909,6 +917,17 @@ ${input}`;
     renderSources();
     renderProducts();
     calculate();
+
+    const params = new URLSearchParams(location.search);
+    if (params.get("q")) {
+      document.getElementById("priceQuery").value = params.get("q");
+    }
+    if (params.get("region")) {
+      document.getElementById("priceRegion").value = params.get("region");
+    }
+    if (params.get("autoPrice") === "1") {
+      setTimeout(searchPrices, 200);
+    }
   </script>
 </body>
 </html>
