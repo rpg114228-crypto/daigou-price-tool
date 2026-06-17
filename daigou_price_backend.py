@@ -53,7 +53,7 @@ SOURCES = [
         "name": "Amazon JP",
         "currency": "JPY",
         "url": "https://www.amazon.co.jp/s?k={q}",
-        "price_patterns": [r"[¥￥]\s*([0-9,]{3,})"],
+        "price_patterns": [],
     },
     {
         "region": "台灣",
