@@ -186,13 +186,6 @@
     .status.ready { color: var(--ok); }
     .status.hot { color: var(--danger); }
 
-    .links {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
     table {
       width: 100%;
       border-collapse: collapse;
@@ -288,19 +281,6 @@
             搜尋商品 / 型號
             <input id="keyword" placeholder="例：BX-50、UX-20、ストームペガシス、戰鬥陀螺">
           </label>
-          <label style="flex: 1 1 160px;">
-            國家
-            <select id="region">
-              <option value="all">全部</option>
-              <option value="jp">日本</option>
-              <option value="my">馬來西亞</option>
-              <option value="hk">香港</option>
-              <option value="sg">新加坡</option>
-              <option value="th">泰國</option>
-              <option value="kr">韓國</option>
-              <option value="tw">台灣</option>
-            </select>
-          </label>
           <button id="renderBtn">更新</button>
           <button class="secondary" id="exportBtn">匯出 JSON</button>
         </div>
@@ -308,15 +288,19 @@
       </section>
 
       <aside class="section">
-        <h2>正品來源規則</h2>
+        <h2>商品狀態</h2>
         <table>
           <thead>
-            <tr><th>國家</th><th>優先來源</th><th>風險</th></tr>
+            <tr><th>狀態</th><th>判斷</th><th>動作</th></tr>
           </thead>
-          <tbody id="sourceRows"></tbody>
+          <tbody>
+            <tr><td>高關注</td><td>新品、聯名、復刻或預購熱度高</td><td>優先一鍵查價</td></tr>
+            <tr><td>可追蹤</td><td>已發售、配件、補貨型商品</td><td>定期查價</td></tr>
+            <tr><td>略過</td><td>價差小、來源不穩、假貨風險高</td><td>不列入首頁</td></tr>
+          </tbody>
         </table>
         <p class="note">
-          原則：先用日本 TAKARA TOMY 官方頁確認型號與定價，再查各國官方/授權通路。Shopee、Lazada 只優先看 Mall 或官方店，一般賣場只當行情參考。
+          首頁只顯示需要你關注的商品。實際網站來源、價格、幣別與台幣估算集中在「一鍵查價」區塊。
         </p>
       </aside>
     </div>
@@ -629,20 +613,8 @@
       return "NT$" + Math.round(Number(n || 0)).toLocaleString("zh-TW");
     }
 
-    function makeSearchLinks(product, selectedRegion) {
-      const keys = selectedRegion === "all" ? Object.keys(regions) : [selectedRegion];
-      const links = [];
-      keys.forEach(key => {
-        regions[key].searches.forEach(([label, base]) => {
-          links.push(`<a class="btn secondary" target="_blank" rel="noopener" href="${base}${encodeURIComponent(product.query)}">${regions[key].name} ${label}</a>`);
-        });
-      });
-      return links.join("");
-    }
-
     function renderProducts() {
       const keyword = document.getElementById("keyword").value.trim().toLowerCase();
-      const selectedRegion = document.getElementById("region").value;
       const box = document.getElementById("productCards");
       const filtered = products.filter(item => {
         const hay = `${item.code} ${item.name} ${item.zh} ${item.category} ${item.query}`.toLowerCase();
@@ -662,19 +634,9 @@
             <span class="chip">${item.currency} ${item.officialPrice.toLocaleString("ja-JP")}</span>
             ${item.tags.map(tag => `<span class="chip">${tag}</span>`).join("")}
           </div>
-          <div class="links">${makeSearchLinks(item, selectedRegion)}</div>
+          <button class="secondary" type="button" onclick="useProductForPrice('${item.code}')">帶入一鍵查價</button>
         </article>
       `).join("") || `<div class="note">沒有符合的商品。</div>`;
-    }
-
-    function renderSources() {
-      document.getElementById("sourceRows").innerHTML = Object.values(regions).map(region => `
-        <tr>
-          <td>${region.name}</td>
-          <td>${region.sources}</td>
-          <td>${region.risk}</td>
-        </tr>
-      `).join("");
     }
 
     function calculate() {
@@ -697,6 +659,14 @@
       if (!row.price) return "-";
       const value = Math.round(row.price).toLocaleString("zh-TW");
       return `${row.currency} ${value}`;
+    }
+
+    function useProductForPrice(code) {
+      const item = products.find(product => product.code === code);
+      if (!item) return;
+      document.getElementById("priceQuery").value = item.query;
+      document.getElementById("priceSummary").textContent = `已帶入：${item.code} ${item.zh}`;
+      document.getElementById("priceQuery").scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
     function getPriceApiBase() {
@@ -732,11 +702,18 @@
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "查價失敗");
         const bestKey = data.best ? `${data.best.source}|${data.best.url}` : "";
-        rows.innerHTML = data.results.map(row => {
+        const priced = data.results.filter(row => row.price_twd !== null && row.price_twd !== undefined);
+        const skipped = data.results.filter(row => row.price_twd === null || row.price_twd === undefined);
+        if (!priced.length) {
+          rows.innerHTML = `<tr><td colspan="6">目前沒有解析到可用價格。建議縮短關鍵字，或改查型號，例如 BX-50、UX-20。</td></tr>`;
+          summary.textContent = `沒有抓到可用價格。已略過 ${skipped.length} 個動態載入或阻擋來源。`;
+          return;
+        }
+        rows.innerHTML = priced.map(row => {
           const key = `${row.source}|${row.url}`;
           const isBest = key === bestKey;
           const priceTwd = row.price_twd ? `NT$${row.price_twd.toLocaleString("zh-TW")}` : "-";
-          const status = row.price ? row.note : `${row.status}：${row.note}`;
+          const status = row.note;
           return `
             <tr class="${isBest ? "best-row" : ""}">
               <td>${row.region}</td>
@@ -749,7 +726,7 @@
           `;
         }).join("");
         if (data.best) {
-          summary.textContent = `目前最低候選價：${data.best.region} ${data.best.source}，${formatForeignPrice(data.best)}，約 NT$${data.best.price_twd.toLocaleString("zh-TW")}。`;
+          summary.textContent = `目前最低候選價：${data.best.region} ${data.best.source}，${formatForeignPrice(data.best)}，約 NT$${data.best.price_twd.toLocaleString("zh-TW")}。已略過 ${skipped.length} 個未解析來源。`;
           document.getElementById("baseCost").value = Math.round(data.best.price);
           document.getElementById("currency").value = data.best.currency;
           document.getElementById("fxRate").value = fxDefaults[data.best.currency] || 1;
@@ -887,7 +864,6 @@ ${input}`;
 
     document.getElementById("renderBtn").addEventListener("click", renderProducts);
     document.getElementById("keyword").addEventListener("input", renderProducts);
-    document.getElementById("region").addEventListener("change", renderProducts);
     document.getElementById("calcBtn").addEventListener("click", calculate);
     document.getElementById("priceSearchBtn").addEventListener("click", searchPrices);
     document.getElementById("useHotProductBtn").addEventListener("click", useHotProductForPrice);
@@ -914,7 +890,6 @@ ${input}`;
       URL.revokeObjectURL(url);
     });
 
-    renderSources();
     renderProducts();
     calculate();
 
