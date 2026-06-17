@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 HTML_FILE = ROOT / "daigou_beyblade_mvp.html"
+INDEX_FILE = ROOT / "index.html"
 LOG_FILE = ROOT.parent / "work" / "price_backend_debug.log"
 
 FX_TO_TWD = {
@@ -217,7 +218,7 @@ class Handler(BaseHTTPRequestHandler):
             parsed = urlparse(self.path)
             debug_log(f"GET {parsed.path} {parsed.query}")
             if parsed.path == "/":
-                content = HTML_FILE.read_bytes()
+                content = (INDEX_FILE if INDEX_FILE.exists() else HTML_FILE).read_bytes()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(content)))
