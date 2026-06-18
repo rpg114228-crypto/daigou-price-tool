@@ -207,7 +207,7 @@
 
     .result {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 10px;
       margin-top: 12px;
     }
@@ -245,6 +245,7 @@
       color: var(--muted);
       font-size: 13px;
       line-height: 1.6;
+      white-space: pre-line;
     }
 
     .price-table-wrap {
@@ -341,15 +342,17 @@
               <th>網站</th>
               <th>價格</th>
               <th>約台幣</th>
+              <th>可信度</th>
               <th>狀態</th>
               <th>連結</th>
             </tr>
           </thead>
           <tbody id="priceRows">
-            <tr><td colspan="6">尚未查價。</td></tr>
+            <tr><td colspan="7">尚未查價。</td></tr>
           </tbody>
         </table>
       </div>
+      <div class="note" id="priceHistory">歷史價格：尚未查詢。</div>
     </section>
 
     <section class="section">
@@ -375,24 +378,30 @@
           匯率到台幣
           <input id="fxRate" type="number" step="0.0001" value="0.1987">
         </label>
+        <label style="flex: 1 1 90px;">
+          訂購數量
+          <input id="qty" type="number" min="1" step="1" value="1">
+        </label>
         <label style="flex: 1 1 130px;">
-          國際/集運
+          國際/集運（整批總運費）
           <input id="shipCost" type="number" value="160">
         </label>
         <label style="flex: 1 1 130px;">
-          其他成本
+          其他成本（單件）
           <input id="otherCost" type="number" value="40">
         </label>
         <label style="flex: 1 1 130px;">
-          台灣售價
+          台灣售價（單件）
           <input id="twPrice" type="number" value="950">
         </label>
         <button id="calcBtn">計算</button>
       </div>
+      <div class="note">運費以整批總額計算，會依數量分攤到單件成本；數量越多單件運費越低。</div>
       <div class="result">
-        <div class="metric"><small>換算台幣成本</small><strong id="costTwd">NT$0</strong></div>
-        <div class="metric"><small>預估總成本</small><strong id="totalCost">NT$0</strong></div>
-        <div class="metric"><small>預估毛利</small><strong id="profit">NT$0</strong></div>
+        <div class="metric"><small>換算台幣成本（單件）</small><strong id="costTwd">NT$0</strong></div>
+        <div class="metric"><small>預估總成本（單件，含分攤運費）</small><strong id="totalCost">NT$0</strong></div>
+        <div class="metric"><small>預估毛利（單件）</small><strong id="profit">NT$0</strong></div>
+        <div class="metric"><small>預估總毛利（全部數量）</small><strong id="totalProfit">NT$0</strong></div>
       </div>
     </section>
 
@@ -646,14 +655,19 @@
       const ship = Number(document.getElementById("shipCost").value || 0);
       const other = Number(document.getElementById("otherCost").value || 0);
       const tw = Number(document.getElementById("twPrice").value || 0);
+      const qty = Math.max(1, Number(document.getElementById("qty").value || 1));
       const costTwd = base * fx;
-      const total = costTwd + ship + other;
+      const shipPerUnit = ship / qty;
+      const total = costTwd + shipPerUnit + other;
       const profit = tw - total;
+      const totalProfit = profit * qty;
 
       document.getElementById("costTwd").textContent = money(costTwd);
       document.getElementById("totalCost").textContent = money(total);
       document.getElementById("profit").textContent = money(profit);
       document.getElementById("profit").style.color = profit >= 0 ? "var(--ok)" : "var(--danger)";
+      document.getElementById("totalProfit").textContent = money(totalProfit);
+      document.getElementById("totalProfit").style.color = totalProfit >= 0 ? "var(--ok)" : "var(--danger)";
     }
 
     function formatForeignPrice(row) {
@@ -682,12 +696,14 @@
       const region = document.getElementById("priceRegion").value;
       const rows = document.getElementById("priceRows");
       const summary = document.getElementById("priceSummary");
+      const history = document.getElementById("priceHistory");
       if (!query) {
         summary.textContent = "請先輸入商品名稱或型號。";
         return;
       }
-      rows.innerHTML = `<tr><td colspan="6">查價中，請稍候...</td></tr>`;
+      rows.innerHTML = `<tr><td colspan="7">查價中，請稍候...</td></tr>`;
       summary.textContent = "正在抓取各網站候選價格。";
+      history.textContent = "歷史價格：查價完成後更新。";
       try {
         const base = getPriceApiBase();
         const isPages = location.hostname.endsWith("github.io");
@@ -702,11 +718,13 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "查價失敗");
+        if (data.fx_to_twd) Object.assign(fxDefaults, data.fx_to_twd);
         const bestKey = data.best ? `${data.best.source}|${data.best.url}` : "";
         const priced = data.results.filter(row => row.price_twd !== null && row.price_twd !== undefined);
         const skipped = data.results.filter(row => row.price_twd === null || row.price_twd === undefined);
+        loadPriceHistory(query);
         if (!priced.length) {
-          rows.innerHTML = `<tr><td colspan="6">目前沒有解析到可用價格。建議縮短關鍵字，或改查型號，例如 BX-50、UX-20。</td></tr>`;
+          rows.innerHTML = `<tr><td colspan="7">目前沒有解析到可用價格。建議縮短關鍵字，或改查型號，例如 BX-50、UX-20。</td></tr>`;
           summary.textContent = `沒有抓到可用價格。已略過 ${skipped.length} 個動態載入或阻擋來源。`;
           return;
         }
@@ -724,6 +742,14 @@
             td.textContent = text;
             tr.appendChild(td);
           });
+
+          const confidenceTd = document.createElement("td");
+          const confidence = document.createElement("span");
+          const isHigh = row.confidence === "high";
+          confidence.className = isHigh ? "status ready" : "status";
+          confidence.textContent = isHigh ? "高" : "低";
+          confidenceTd.appendChild(confidence);
+          tr.insertBefore(confidenceTd, tr.children[4]);
 
           const linkTd = document.createElement("td");
           if (/^https?:\/\//i.test(row.url || "")) {
@@ -750,8 +776,34 @@
           summary.textContent = "沒有解析到價格。可能是網站動態載入、阻擋爬取，或需要改用 API/Playwright。";
         }
       } catch (error) {
-        rows.innerHTML = `<tr><td colspan="6">查價失敗：${error.message}</td></tr>`;
+        rows.innerHTML = `<tr><td colspan="7">查價失敗：${error.message}</td></tr>`;
         summary.textContent = "查價失敗。請確認本機已啟動 start_daigou_tool.bat，且查價後端 API 是 http://127.0.0.1:8787。若仍失敗，請更新後端檔案，舊版可能缺少瀏覽器跨來源允許設定。";
+        history.textContent = "歷史價格：查價失敗，未更新。";
+      }
+    }
+
+    async function loadPriceHistory(query) {
+      const history = document.getElementById("priceHistory");
+      try {
+        const base = getPriceApiBase();
+        const res = await fetch(`${base}/api/history?q=${encodeURIComponent(query)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "讀取歷史失敗");
+        if (!data.history.length) {
+          history.textContent = "歷史價格：尚無記錄。";
+          return;
+        }
+        const lines = data.history
+          .slice(-8)
+          .reverse()
+          .map(item => {
+            const price = item.price_twd ? `NT$${Number(item.price_twd).toLocaleString("zh-TW")}` : "-";
+            return `${item.time || "-"}｜${item.source || "-"}｜${price}`;
+          });
+        history.textContent = `歷史價格：\n${lines.join("\n")}`;
+      } catch (error) {
+        history.textContent = `歷史價格：讀取失敗（${error.message}）。`;
       }
     }
 

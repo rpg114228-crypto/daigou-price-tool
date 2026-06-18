@@ -15,9 +15,11 @@ ROOT = Path(__file__).resolve().parent
 HTML_FILE = ROOT / "daigou_beyblade_mvp.html"
 INDEX_FILE = ROOT / "index.html"
 LOG_FILE = ROOT.parent / "work" / "price_backend_debug.log"
+HISTORY_FILE = ROOT.parent / "work" / "price_history.jsonl"
+FX_API_URL = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/twd.json"
 
-FX_UPDATED_AT = "2026-06-18"  # 銀行牌告即期賣出參考，需定期更新
-FX_TO_TWD = {
+DEFAULT_FX_UPDATED_AT = "2026-06-18"  # fallback，抓取即時匯率失敗時使用
+DEFAULT_FX_TO_TWD = {
     "JPY": 0.1987,
     "TWD": 1.0,
     "MYR": 7.150,
@@ -26,6 +28,10 @@ FX_TO_TWD = {
     "THB": 0.986,
     "KRW": 0.0235,
 }
+FX_UPDATED_AT = DEFAULT_FX_UPDATED_AT
+FX_TO_TWD = DEFAULT_FX_TO_TWD.copy()
+LIVE_FX_CODES = ("JPY", "MYR", "HKD", "SGD", "THB", "KRW")
+HIGH_CONFIDENCE_PARSERS = {"pchome_json", "momo_jsonld", "rakuten_jsonld", "amazon_search"}
 
 MIN_PRICE = {
     "JPY": 300,
@@ -138,6 +144,31 @@ def fetch_source_html(source, url):
     if source.get("engine") == "playwright":
         return fetch_rendered(url, locale=source.get("locale", "ja-JP"))
     return fetch_text(url)
+
+
+def refresh_fx_rates():
+    global FX_UPDATED_AT, FX_TO_TWD
+    try:
+        data = json.loads(fetch_text(FX_API_URL))
+        rates = data.get("twd") or {}
+        updated = data.get("date")
+        live = DEFAULT_FX_TO_TWD.copy()
+        for code in LIVE_FX_CODES:
+            raw = rates.get(code.lower())
+            rate = float(raw)
+            if rate <= 0:
+                raise ValueError(f"invalid rate for {code}")
+            live[code] = 1 / rate
+        live["TWD"] = 1.0
+        if not updated:
+            raise ValueError("missing fx date")
+        FX_TO_TWD = live
+        FX_UPDATED_AT = updated
+        debug_log(f"FX_LIVE date={FX_UPDATED_AT}")
+    except Exception as exc:
+        FX_TO_TWD = DEFAULT_FX_TO_TWD.copy()
+        FX_UPDATED_AT = DEFAULT_FX_UPDATED_AT
+        debug_log(f"FX_FALLBACK {type(exc).__name__}: {exc}")
 
 
 def clean_price(value):
@@ -333,6 +364,7 @@ def search_one_source(source, query):
         "title": "",
         "note": "",
         "elapsed_ms": None,
+        "confidence": "high" if source.get("parser") in HIGH_CONFIDENCE_PARSERS else "low",
     }
     try:
         html = fetch_source_html(source, url)
@@ -425,6 +457,53 @@ def debug_log(message):
         pass
 
 
+def append_price_history(query, best):
+    if not best:
+        return
+    record = {
+        "query": query,
+        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "region": best.get("region"),
+        "source": best.get("source"),
+        "currency": best.get("currency"),
+        "price": best.get("price"),
+        "price_twd": best.get("price_twd"),
+        "url": best.get("url"),
+    }
+    try:
+        HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with HISTORY_FILE.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception as exc:
+        debug_log(f"HISTORY_WRITE_FAIL {type(exc).__name__}: {exc}")
+
+
+def read_price_history(query):
+    history = []
+    try:
+        if not HISTORY_FILE.exists():
+            return history
+        with HISTORY_FILE.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if record.get("query") != query:
+                    continue
+                history.append({
+                    "time": record.get("time"),
+                    "source": record.get("source"),
+                    "price_twd": record.get("price_twd"),
+                })
+    except Exception as exc:
+        debug_log(f"HISTORY_READ_FAIL {type(exc).__name__}: {exc}")
+    return history
+
+
 class Handler(BaseHTTPRequestHandler):
     def send_json(self, payload, status=200):
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -465,6 +544,7 @@ class Handler(BaseHTTPRequestHandler):
                 debug_log(f"PRICE_DONE count={len(results)}")
                 valid = [r for r in results if r["price_twd"] is not None]
                 best = min(valid, key=lambda r: r["price_twd"]) if valid else None
+                append_price_history(query, best)
                 self.send_json({
                     "ok": True,
                     "query": query,
@@ -472,6 +552,19 @@ class Handler(BaseHTTPRequestHandler):
                     "best": best,
                     "results": results,
                     "fx_updated_at": FX_UPDATED_AT,
+                    "fx_to_twd": FX_TO_TWD,
+                })
+                return
+            if parsed.path == "/api/history":
+                params = parse_qs(parsed.query)
+                query = (params.get("q") or [""])[0].strip()
+                if not query:
+                    self.send_json({"ok": False, "error": "missing q"}, 400)
+                    return
+                self.send_json({
+                    "ok": True,
+                    "query": query,
+                    "history": read_price_history(query),
                 })
                 return
             self.send_json({"ok": False, "error": "not found"}, 404)
@@ -487,5 +580,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    refresh_fx_rates()
     server = ThreadingHTTPServer(("127.0.0.1", 8787), Handler)
     server.serve_forever()
